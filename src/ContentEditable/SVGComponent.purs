@@ -80,6 +80,7 @@ svgContenteditable =
 
     TextInput (ContentEditable.TextUpdate text) next -> next <$ do
       H.raise $ TextUpdate text
+      eval $ H.action UpdateForeignObjectShape
 
     UpdateForeignObjectShape next -> next <$ do
       state <- H.get
