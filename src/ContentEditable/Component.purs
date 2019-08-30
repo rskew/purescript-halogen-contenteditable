@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Data.Traversable (traverse, for_)
+import Data.Traversable (traverse,  for_)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Halogen as H
@@ -26,6 +26,7 @@ type State = String
 
 data Query a =
     Init a
+  | SetText String a
   | TextInput KE.KeyboardEvent a
   | GetScrollShape (Maybe { width :: Number, height :: Number } -> a)
 
@@ -66,12 +67,15 @@ contenteditable =
     -- | own state and updates its text outside of Halogen's control.
     Init next -> next <$ do
       state <- H.get
+      eval $ H.action $ SetText state
+
+    SetText text next -> next <$ do
       maybeRef <- H.getHTMLElementRef editorRef
       case maybeRef of
         Nothing -> pure unit
         Just element -> do
           let node = toNode element
-          H.liftEffect $ setText state node
+          H.liftEffect $ setText text node
 
     TextInput keyboardEvent next -> next <$ do
       let event = KE.toEvent keyboardEvent
@@ -99,6 +103,10 @@ setText text editorNode =
   let
     lines = String.split (String.Pattern "\n") text
   in do
+    -- Clear existing text
+    children <- DN.childNodes editorNode >>= NL.toArray
+    for_ children \child -> DN.removeChild child editorNode
+    -- Insert lines as individual divs
     window <- WH.window
     documentHTML <- document window
     let document = toDocument documentHTML

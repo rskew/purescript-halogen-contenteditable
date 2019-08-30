@@ -10,7 +10,8 @@
     "purescript-prelude": "^4.1.1",
     "purescript-console": "^4.2.0",
     "purescript-effect": "^2.0.1",
-    "purescript-halogen": "4.0.0"
+    "purescript-halogen": "4.0.0",
+    "purescript-halogen-svg": "git@github.com/rskew/purescript-halogen-svg.git#d71b1fc744c1d390558ecf9aef603257ba5f49dd"
   },
   "devDependencies": {
     "purescript-psci-support": "^4.0.0"
