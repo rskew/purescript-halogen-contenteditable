@@ -4,13 +4,12 @@ import Prelude
 
 import ContentEditable.Component as ContentEditable
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Symbol (SProxy(..))
 import Effect.Aff (Aff)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Svg.Attributes as SA
 import Svg.Elements as SE
-import Web.Event.Event as WE
 
 type Shape = { width :: Number, height :: Number }
 
@@ -20,69 +19,62 @@ type State = { shape :: Shape
              , fitContentDynamic :: Boolean
              }
 
+data Action
+  = Init
+  | TextInput ContentEditable.Message
+  | UpdateForeignObjectShape
+
 data Query a
-  = PreventDefault WE.Event (Query a)
-  | StopPropagation WE.Event (Query a)
-  | Init a
-  | TextInput ContentEditable.Message a
-  | UpdateForeignObjectShape a
-  | SetText String a
+  = SetText String a
 
 data Message = TextUpdate String
 
+type Slot = H.Slot Query Message
+
 type Input = State
 
-data Slot = InnerContentEditable
-derive instance eqSlot :: Eq Slot
-derive instance ordSlot :: Ord Slot
+type Slots = ( innerContentEditable :: ContentEditable.Slot Unit )
+
+_innerContentEditable :: SProxy "innerContentEditable"
+_innerContentEditable = SProxy
 
 svgContenteditable :: H.Component HH.HTML Query Input Message Aff
 svgContenteditable =
-  H.lifecycleParentComponent
-    { initialState : initialState
+  H.mkComponent
+    { initialState : identity
     , render : render
-    , eval : eval
-    , receiver : const Nothing
-    , initializer : Just $ H.action Init
-    , finalizer : Nothing
+    , eval: H.mkEval (H.defaultEval { handleAction = handleAction
+                                    , handleQuery = handleQuery
+                                    , initialize   = Just Init
+                                    })
     }
   where
 
-  initialState :: Input -> State
-  initialState = identity
-
-  render :: State -> H.ParentHTML Query ContentEditable.Query Slot Aff
+  render :: State -> H.ComponentHTML Action Slots Aff
   render state =
       SE.foreignObject
       [ SA.height state.shape.height
       , SA.width state.shape.width
       ]
       [ HH.slot
-        InnerContentEditable
+        (SProxy :: SProxy "innerContentEditable")
+        unit
         ContentEditable.contenteditable
         state.initialText
-        (HE.input TextInput)
+        (Just <<< TextInput)
       ]
 
-  eval :: Query ~> H.ParentDSL State Query ContentEditable.Query Slot Message Aff
-  eval = case _ of
-    PreventDefault e q -> do
-      H.liftEffect $ WE.preventDefault e
-      eval q
-
-    StopPropagation e q -> do
-      H.liftEffect $ WE.stopPropagation e
-      eval q
-
-    Init next -> next <$ do
+  handleAction :: Action -> H.HalogenM State Action Slots Message Aff Unit
+  handleAction = case _ of
+    Init -> do
       state <- H.get
-      eval $ H.action UpdateForeignObjectShape
+      handleAction UpdateForeignObjectShape
 
-    TextInput (ContentEditable.TextUpdate text) next -> next <$ do
+    TextInput (ContentEditable.TextUpdate text) -> do
       H.raise $ TextUpdate text
-      eval $ H.action UpdateForeignObjectShape
+      handleAction UpdateForeignObjectShape
 
-    UpdateForeignObjectShape next -> next <$ do
+    UpdateForeignObjectShape -> do
       state <- H.get
       if not state.fitContentDynamic
         then pure unit
@@ -90,15 +82,17 @@ svgContenteditable =
           -- Update foreignObject wrapper shape to fit content.
           -- The actual text box is dynamically sized, but the foreighObject wrapper
           -- can't be set to fit the text, so we update it manually.
-          maybeMaybeTextFieldScrollShape <- H.query InnerContentEditable  $ H.request ContentEditable.GetScrollShape
+          maybeMaybeTextFieldScrollShape <- H.query _innerContentEditable unit $ H.request ContentEditable.GetScrollShape
           let scrollShape = clippedScrollShape state.maxShape
                             $ fromMaybe state.shape
                             $ join maybeMaybeTextFieldScrollShape
           H.modify_ _{ shape = scrollShape}
 
-    SetText text next -> next <$ do
-      _ <- H.query InnerContentEditable $ H.action $ ContentEditable.SetText text
-      eval $ H.action UpdateForeignObjectShape
+  handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Message Aff (Maybe a)
+  handleQuery = case _ of
+    SetText text a -> pure a <$ do
+      _ <- H.query _innerContentEditable unit $ H.tell $ ContentEditable.SetText text
+      handleAction UpdateForeignObjectShape
 
 clippedScrollShape :: Shape -> Shape -> Shape
 clippedScrollShape maxShape textFieldScrollShape =

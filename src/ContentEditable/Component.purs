@@ -24,60 +24,60 @@ import Web.UIEvent.KeyboardEvent as KE
 
 type State = String
 
-data Query a =
-    Init a
+data Action
+  = Init
+  | TextInput KE.KeyboardEvent
+
+data Query a
+  = GetScrollShape (Maybe { width :: Number, height :: Number } -> a)
   | SetText String a
-  | TextInput KE.KeyboardEvent a
-  | GetScrollShape (Maybe { width :: Number, height :: Number } -> a)
 
-data Message = TextUpdate String
+newtype Message = TextUpdate String
 
-contenteditable :: H.Component HH.HTML Query State Message Aff
+type Slot = H.Slot Query Message
+
+type Input = String
+
+type Slots = ()
+
+contenteditable :: H.Component HH.HTML Query Input Message Aff
 contenteditable =
-  H.lifecycleComponent
+  H.mkComponent
     { initialState : identity
     , render : render
-    , eval : eval
-    , receiver : const Nothing
-    , initializer : Just $ H.action Init
-    , finalizer : Nothing
+    , eval: H.mkEval (H.defaultEval { handleAction = handleAction
+                                    , handleQuery  = handleQuery
+                                    , initialize   = Just Init
+                                    })
     }
   where
 
   editorRef :: H.RefLabel
   editorRef = H.RefLabel "editor"
 
-  render :: State -> H.ComponentHTML Query
+  render :: State -> H.ComponentHTML Action Slots Aff
   render _ =
     HH.div
     -- use xmlns for using inside a SVG foreignObject
     [ HH.attr (HH.AttrName "xmlns") "http://www.w3.org/1999/xhtml"
     , HP.class_ $ HH.ClassName "text-field"
     , HH.attr (HH.AttrName "contenteditable") "true"
-    , HE.onKeyUp $ HE.input $ TextInput
+    , HE.onKeyUp $ \e -> Just $ TextInput e
     , HP.ref editorRef
     ]
     []
 
-  eval :: Query ~> H.ComponentDSL State Query Message Aff
-  eval = case _ of
-
+  handleAction :: Action -> H.HalogenM State Action Slots Message Aff Unit
+  handleAction = case _ of
     -- | Update DOM directly to initalise the text of the contenteditable component.
     -- | We can't render the text normally as the contenteditable component keeps its
     -- | own state and updates its text outside of Halogen's control.
-    Init next -> next <$ do
+    Init -> do
       state <- H.get
-      eval $ H.action $ SetText state
+      _ <- handleQuery $ SetText state (\_ -> unit)
+      pure unit
 
-    SetText text next -> next <$ do
-      maybeRef <- H.getHTMLElementRef editorRef
-      case maybeRef of
-        Nothing -> pure unit
-        Just element -> do
-          let node = toNode element
-          H.liftEffect $ setText text node
-
-    TextInput keyboardEvent next -> next <$ do
+    TextInput keyboardEvent -> do
       let event = KE.toEvent keyboardEvent
       let maybeNode = WE.target event >>= DN.fromEventTarget
       case maybeNode of
@@ -87,16 +87,26 @@ contenteditable =
           H.put nodeText
           H.raise $ TextUpdate nodeText
 
+  handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Message Aff (Maybe a)
+  handleQuery = case _ of
+    SetText text a -> pure a <$ do
+      maybeRef <- H.getHTMLElementRef editorRef
+      case maybeRef of
+        Nothing -> pure unit
+        Just element -> do
+          let node = toNode element
+          H.liftEffect $ setText text node
+
     -- | When using inside an SVG foreignObject, the scrollShape needs to be
     -- | known to manually fit the foreignObject to the content
     GetScrollShape reply -> do
       maybeRef <- H.getHTMLElementRef editorRef
       case maybeRef of
-        Nothing -> pure $ reply Nothing
+        Nothing -> pure $ Just $ reply Nothing
         Just element -> do
           scrollWidth <- H.liftEffect $ DE.scrollWidth $ toElement element
           scrollHeight <- H.liftEffect $ DE.scrollHeight $ toElement element
-          pure $ reply $ Just { width : scrollWidth + 10.0, height : scrollHeight + 10.0 }
+          pure $ Just $ reply $ Just { width : scrollWidth + 10.0, height : scrollHeight + 10.0 }
 
 setText :: String -> DN.Node -> Effect Unit
 setText text editorNode =
