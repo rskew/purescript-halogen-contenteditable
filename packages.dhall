@@ -124,7 +124,21 @@ let upstream =
 let overrides = {=}
 
 let additions =
-  { halogen-svg = ../purescript-halogen-svg/spago.dhall as Location
+  { halogen-svg =
+      { dependencies =
+          [ "console"
+          , "effect"
+          , "halogen"
+          , "prelude"
+          , "psci-support"
+          , "strings"
+          , "web-uievents"
+          ]
+      , repo =
+          "https://github.com/rskew/purescript-halogen-svg.git"
+      , version =
+          "a9ad4422ee0fad84537558b46626b824f1883332"
+      }
   }
 
 in  upstream // overrides // additions
