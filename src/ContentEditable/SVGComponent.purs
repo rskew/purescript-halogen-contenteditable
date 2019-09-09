@@ -53,8 +53,8 @@ svgContenteditable =
   render :: State -> H.ComponentHTML Action Slots Aff
   render state =
       SE.foreignObject
-      [ SA.height $ SA.Length $ SA.Px state.shape.height
-      , SA.width $ SA.Length $ SA.Px state.shape.width
+      [ SA.height $ show state.shape.height
+      , SA.width $ show state.shape.width
       ]
       [ HH.slot
         (SProxy :: SProxy "innerContentEditable")

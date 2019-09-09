@@ -137,7 +137,7 @@ let additions =
       , repo =
           "https://github.com/rskew/purescript-halogen-svg.git"
       , version =
-          "a9ad4422ee0fad84537558b46626b824f1883332"
+          "7cbcd1e176a84220c0e66ca5e38a158bc3636dca"
       }
   }
 
