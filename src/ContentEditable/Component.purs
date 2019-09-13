@@ -64,6 +64,7 @@ contenteditable =
     , HH.attr (HH.AttrName "contenteditable") "true"
     , HE.onKeyUp $ \e -> Just $ TextInput e
     , HP.ref editorRef
+    , HP.spellcheck false
     ]
     []
 
