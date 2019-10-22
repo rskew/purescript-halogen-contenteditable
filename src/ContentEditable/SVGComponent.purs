@@ -26,6 +26,8 @@ data Action
 
 data Query a
   = SetText String a
+  | Focus a
+  | Blur a
 
 data Message = TextUpdate String
 
@@ -93,6 +95,12 @@ svgContenteditable =
     SetText text a -> pure a <$ do
       _ <- H.query _innerContentEditable unit $ H.tell $ ContentEditable.SetText text
       handleAction UpdateForeignObjectShape
+
+    Focus a -> pure a <$ do
+      H.query _innerContentEditable unit $ H.tell $ ContentEditable.Focus
+
+    Blur a -> pure a <$ do
+      H.query _innerContentEditable unit $ H.tell $ ContentEditable.Blur
 
 clippedScrollShape :: Shape -> Shape -> Shape
 clippedScrollShape maxShape textFieldScrollShape =

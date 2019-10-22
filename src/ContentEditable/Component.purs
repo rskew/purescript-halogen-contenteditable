@@ -16,7 +16,7 @@ import Web.DOM.Node as DN
 import Web.DOM.NodeList as NL
 import Web.DOM.Document (createElement)
 import Web.HTML as WH
-import Web.HTML.HTMLElement (toNode, fromElement, toElement)
+import Web.HTML.HTMLElement (toNode, fromElement, toElement, focus, blur)
 import Web.HTML.HTMLDocument (toDocument)
 import Web.HTML.Window (document)
 import Web.Event.Event as WE
@@ -31,6 +31,8 @@ data Action
 data Query a
   = GetScrollShape (Maybe { width :: Number, height :: Number } -> a)
   | SetText String a
+  | Focus a
+  | Blur a
 
 newtype Message = TextUpdate String
 
@@ -108,6 +110,20 @@ contenteditable =
           scrollWidth <- H.liftEffect $ DE.scrollWidth $ toElement element
           scrollHeight <- H.liftEffect $ DE.scrollHeight $ toElement element
           pure $ Just $ reply $ Just { width : scrollWidth + 10.0, height : scrollHeight + 10.0 }
+
+    Focus a -> pure a <$ do
+      maybeRef <- H.getHTMLElementRef editorRef
+      case maybeRef of
+        Nothing -> pure unit
+        Just element ->
+          H.liftEffect $ focus element
+
+    Blur a -> pure a <$ do
+      maybeRef <- H.getHTMLElementRef editorRef
+      case maybeRef of
+        Nothing -> pure unit
+        Just element ->
+          H.liftEffect $ blur element
 
 setText :: String -> DN.Node -> Effect Unit
 setText text editorNode =
