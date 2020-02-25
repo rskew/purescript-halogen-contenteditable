@@ -21,15 +21,20 @@ type State = { shape :: Shape
 
 data Action
   = Init
-  | TextInput ContentEditable.Message
+  | TextInput String
   | UpdateForeignObjectShape
+  | OnFocus
+  | OnBlur
 
 data Query a
   = SetText String a
   | Focus a
   | Blur a
 
-data Message = TextUpdate String
+data Message
+  = TextUpdate String
+  | Focused
+  | Blurred
 
 type Slot = H.Slot Query Message
 
@@ -63,7 +68,10 @@ svgContenteditable =
         unit
         ContentEditable.contenteditable
         state.initialText
-        (Just <<< TextInput)
+        case _ of
+          ContentEditable.TextUpdate text -> Just $ TextInput text
+          ContentEditable.Focused -> Just OnFocus
+          ContentEditable.Blurred -> Just OnBlur
       ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Message Aff Unit
@@ -72,7 +80,7 @@ svgContenteditable =
       state <- H.get
       handleAction UpdateForeignObjectShape
 
-    TextInput (ContentEditable.TextUpdate text) -> do
+    TextInput text -> do
       H.raise $ TextUpdate text
       handleAction UpdateForeignObjectShape
 
@@ -89,6 +97,10 @@ svgContenteditable =
                             $ fromMaybe state.shape
                             $ join maybeMaybeTextFieldScrollShape
           H.modify_ _{ shape = scrollShape}
+
+    OnFocus -> H.raise Focused
+
+    OnBlur -> H.raise Blurred
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Message Aff (Maybe a)
   handleQuery = case _ of

@@ -27,6 +27,8 @@ type State = String
 data Action
   = Init
   | TextInput KE.KeyboardEvent
+  | OnFocus
+  | OnBlur
 
 data Query a
   = GetScrollShape (Maybe { width :: Number, height :: Number } -> a)
@@ -34,7 +36,10 @@ data Query a
   | Focus a
   | Blur a
 
-newtype Message = TextUpdate String
+data Message
+  = TextUpdate String
+  | Focused
+  | Blurred
 
 type Slot = H.Slot Query Message
 
@@ -64,9 +69,11 @@ contenteditable =
     [ HH.attr (HH.AttrName "xmlns") "http://www.w3.org/1999/xhtml"
     , HP.class_ $ HH.ClassName "text-field"
     , HH.attr (HH.AttrName "contenteditable") "true"
-    , HE.onKeyUp $ \e -> Just $ TextInput e
+    , HE.onKeyUp \e -> Just $ TextInput e
     , HP.ref editorRef
     , HP.spellcheck false
+    , HE.onFocus \e -> Just OnFocus
+    , HE.onBlur \e -> Just OnBlur
     ]
     []
 
@@ -89,6 +96,10 @@ contenteditable =
           nodeText <- H.liftEffect $ getContentEditableText node
           H.put nodeText
           H.raise $ TextUpdate nodeText
+
+    OnFocus -> H.raise Focused
+
+    OnBlur -> H.raise Blurred
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Message Aff (Maybe a)
   handleQuery = case _ of
