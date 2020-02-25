@@ -38,8 +38,8 @@ data Query a
 
 data Message
   = TextUpdate String
-  | Focused
-  | Blurred
+  | Focused String
+  | Blurred String
 
 type Slot = H.Slot Query Message
 
@@ -97,9 +97,13 @@ contenteditable =
           H.put nodeText
           H.raise $ TextUpdate nodeText
 
-    OnFocus -> H.raise Focused
+    OnFocus -> do
+      state <- H.get
+      H.raise $ Focused state
 
-    OnBlur -> H.raise Blurred
+    OnBlur -> do
+      state <- H.get
+      H.raise $ Blurred state
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Message Aff (Maybe a)
   handleQuery = case _ of
